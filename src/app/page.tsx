@@ -16,6 +16,8 @@ import {
   CircleDollarSign,
   Clock,
   Zap,
+  Download,
+  X,
 } from 'lucide-react'
 
 interface RateData {
@@ -30,6 +32,12 @@ interface RateData {
 }
 
 type ConvertDirection = 'VEStoUSD' | 'USDtoVES' | 'VEStoEUR' | 'EURtoVES' | 'VEStoYadio' | 'YadiotoVES'
+
+// Extend Window interface for PWA install prompt
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
 
 function formatRate(rate: number | null): string {
   if (rate === null) return 'N/A'
@@ -53,6 +61,46 @@ export default function Home() {
   const [direction, setDirection] = useState<ConvertDirection>('USDtoVES')
   const [result, setResult] = useState<number | null>(null)
 
+  // PWA install state
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [showInstallBanner, setShowInstallBanner] = useState(false)
+  const [isInstalled, setIsInstalled] = useState(false)
+
+  // PWA install prompt handler
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault()
+      setInstallPrompt(e as BeforeInstallPromptEvent)
+      setShowInstallBanner(true)
+    }
+
+    window.addEventListener('beforeinstallprompt', handler)
+
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true)
+    }
+
+    window.addEventListener('appinstalled', () => {
+      setIsInstalled(true)
+      setShowInstallBanner(false)
+      setInstallPrompt(null)
+    })
+
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  const handleInstall = async () => {
+    if (!installPrompt) return
+    await installPrompt.prompt()
+    const choice = await installPrompt.userChoice
+    if (choice.outcome === 'accepted') {
+      setIsInstalled(true)
+      setShowInstallBanner(false)
+    }
+    setInstallPrompt(null)
+  }
+
   const fetchRates = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true)
     else setLoading(true)
@@ -73,7 +121,6 @@ export default function Home() {
 
   useEffect(() => {
     fetchRates()
-    // Auto-refresh every 5 minutes
     const interval = setInterval(() => fetchRates(), 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [fetchRates])
@@ -159,8 +206,42 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* PWA Install Banner */}
+      {showInstallBanner && !isInstalled && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-4 py-3 shadow-lg shadow-emerald-600/30">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                <Download className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Instalar VE Rates</p>
+                <p className="text-xs text-white/80">Acceso rápido desde tu pantalla de inicio</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={handleInstall}
+                className="bg-white text-emerald-700 hover:bg-white/90 h-8 text-xs font-semibold"
+              >
+                Instalar
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowInstallBanner(false)}
+                className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
+      <header className={`sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl ${showInstallBanner && !isInstalled ? 'mt-12' : ''}`}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
