@@ -36,37 +36,22 @@ async function fetchBCVRates(): Promise<{ usd: number | null; eur: number | null
 
     const usd = bcvOficial?.promedio || null;
 
-    // Fetch EUR rate from BCV
+    // Fetch EUR rate from BCV - separate endpoint
     let eur: number | null = null;
     try {
-      const eurResponse = await fetch('https://ve.dolarapi.com/v1/dolares/oficial/euro', {
+      const eurResponse = await fetch('https://ve.dolarapi.com/v1/euros', {
         next: { revalidate: 300 },
       });
       if (eurResponse.ok) {
         const eurData = await eurResponse.json();
-        eur = eurData?.promedio || eurData?.precio || null;
+        // Find official EUR rate
+        const eurOficial = eurData.find(
+          (item: { fuente: string }) => item.fuente.toLowerCase() === 'oficial'
+        );
+        eur = eurOficial?.promedio || null;
       }
     } catch {
-      // If EUR endpoint fails, calculate from USD rate approximately
-      console.log('EUR BCV endpoint not available, trying alternative');
-    }
-
-    // If we couldn't get EUR directly, try to estimate it
-    if (!eur && usd) {
-      try {
-        const frankfurterResponse = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD', {
-          next: { revalidate: 300 },
-        });
-        if (frankfurterResponse.ok) {
-          const frankfurterData = await frankfurterResponse.json();
-          const eurToUsd = frankfurterData?.rates?.USD;
-          if (eurToUsd) {
-            eur = usd / eurToUsd;
-          }
-        }
-      } catch {
-        console.log('Frankfurter API not available for EUR calculation');
-      }
+      console.log('EUR BCV endpoint not available');
     }
 
     return { usd, eur };
