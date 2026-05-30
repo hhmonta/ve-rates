@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VE Rates</string>
+    <string name="app_short_name">VE Rates</string>
+    <color name="background">#0a0a0a</color>
+    <color name="primary">#10b981</color>
+</resources>
