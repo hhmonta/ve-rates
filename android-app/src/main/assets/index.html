@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>VE Rates</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0a0a0a; color: #f0f0f0;
+    min-height: 100vh; overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Header */
+  .header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(10,10,10,0.85); backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .header-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+  }
+  .header-icon svg { width: 20px; height: 20px; color: white; }
+  .header-title { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-sub { font-size: 11px; color: #888; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .header-time { font-size: 11px; color: #888; display: none; }
+  .refresh-btn {
+    width: 34px; height: 34px; border-radius: 8px; border: none;
+    background: transparent; color: #888; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .refresh-btn:active { background: rgba(255,255,255,0.05); }
+  .refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  /* Main */
+  .main { max-width: 640px; margin: 0 auto; padding: 16px; }
+
+  /* Rate Cards */
+  .rates-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 10px; }
+  @media (min-width: 420px) { .rates-grid { grid-template-columns: repeat(3, 1fr); } }
+
+  .rate-card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px; padding: 16px; position: relative; overflow: hidden;
+  }
+  .rate-card:active { background: rgba(255,255,255,0.05); }
+  .rate-card .bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .rate-card.usd .bar { background: linear-gradient(90deg, #10b981, #059669); }
+  .rate-card.eur .bar { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+  .rate-card.yadio .bar { background: linear-gradient(90deg, #f59e0b, #d97706); }
+
+  .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .card-label { display: flex; align-items: center; gap: 8px; }
+  .card-icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card-icon svg { width: 16px; height: 16px; }
+  .usd .card-icon { background: rgba(16,185,129,0.1); }
+  .usd .card-icon svg { color: #10b981; }
+  .eur .card-icon { background: rgba(59,130,246,0.1); }
+  .eur .card-icon svg { color: #3b82f6; }
+  .yadio .card-icon { background: rgba(245,158,11,0.1); }
+  .yadio .card-icon svg { color: #f59e0b; }
+
+  .card-name { font-size: 12px; font-weight: 500; color: #888; }
+  .badge {
+    font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: 6px;
+    border: none;
+  }
+  .usd .badge, .eur .badge { background: rgba(16,185,129,0.1); color: #10b981; }
+  .yadio .badge { background: rgba(245,158,11,0.1); color: #f59e0b; }
+
+  .card-price { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 2px; }
+  .card-bs { font-size: 13px; font-weight: 400; color: #888; margin-left: 4px; }
+  .card-source { font-size: 11px; color: #10b981; display: flex; align-items: center; gap: 4px; }
+  .eur .card-source { color: #3b82f6; }
+  .yadio .card-source { color: #f59e0b; }
+  .card-source svg { width: 12px; height: 12px; }
+
+  .skeleton { height: 34px; width: 120px; background: rgba(255,255,255,0.05); border-radius: 6px; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* Spread */
+  .spread-card {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .spread-label { font-size: 13px; color: #888; }
+  .spread-value { font-size: 13px; font-weight: 600; }
+
+  /* Calculator */
+  .calc-card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px; padding: 16px; margin-bottom: 10px;
+  }
+  .calc-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .calc-icon {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(139,92,246,0.3);
+  }
+  .calc-icon svg { width: 16px; height: 16px; color: white; }
+  .calc-title { font-size: 15px; font-weight: 600; }
+  .calc-subtitle { font-size: 11px; color: #888; margin-top: 2px; }
+
+  .dir-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 14px; }
+  @media (min-width: 420px) { .dir-grid { grid-template-columns: repeat(3, 1fr); } }
+
+  .dir-btn {
+    font-size: 11px; padding: 6px 8px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08); background: transparent;
+    color: #888; cursor: pointer; text-align: center;
+  }
+  .dir-btn:active { background: rgba(255,255,255,0.05); }
+  .dir-btn.active {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    color: white; border-color: transparent;
+    box-shadow: 0 4px 12px rgba(139,92,246,0.3);
+  }
+
+  .separator { height: 1px; background: rgba(255,255,255,0.06); margin-bottom: 14px; }
+
+  .input-group { margin-bottom: 10px; }
+  .input-label { font-size: 11px; font-weight: 500; color: #888; margin-bottom: 6px; }
+  .input-wrap { position: relative; }
+  .input-wrap input {
+    width: 100%; height: 46px; font-size: 17px; padding: 0 60px 0 14px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; color: #f0f0f0; outline: none;
+  }
+  .input-wrap input:focus { border-color: rgba(139,92,246,0.4); }
+  .input-badge {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 11px; padding: 2px 8px; border-radius: 6px;
+    background: rgba(255,255,255,0.06); color: #888;
+  }
+
+  .swap-row { display: flex; justify-content: center; margin: 6px 0; }
+  .swap-btn {
+    width: 30px; height: 30px; border-radius: 50%; border: none;
+    background: transparent; color: #888; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .swap-btn:active { background: rgba(255,255,255,0.05); }
+
+  .result-box {
+    height: 50px; border-radius: 10px; padding: 0 14px;
+    background: rgba(139,92,246,0.03); border: 1px solid rgba(139,92,246,0.08);
+    display: flex; align-items: center;
+  }
+  .result-value { font-size: 19px; font-weight: 700; }
+  .result-empty { font-size: 19px; color: rgba(255,255,255,0.15); }
+
+  .rate-used {
+    font-size: 11px; color: #888; background: rgba(255,255,255,0.02);
+    border-radius: 8px; padding: 8px 12px; margin-top: 10px;
+  }
+  .rate-used b { color: #aaa; }
+
+  /* Quick amounts */
+  .quick-card {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
+  }
+  .quick-label { font-size: 11px; font-weight: 500; color: #888; margin-bottom: 8px; }
+  .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  @media (min-width: 420px) { .quick-grid { grid-template-columns: repeat(8, 1fr); } }
+  .quick-btn {
+    font-size: 12px; padding: 6px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08); background: transparent;
+    color: #888; cursor: pointer; text-align: center;
+  }
+  .quick-btn:active { background: rgba(255,255,255,0.05); color: #f0f0f0; }
+
+  /* Footer */
+  .footer { text-align: center; padding: 12px 0; font-size: 11px; color: rgba(255,255,255,0.2); }
+  .footer p + p { margin-top: 4px; }
+
+  /* Offline banner */
+  .offline-banner {
+    background: #dc2626; color: white; text-align: center;
+    padding: 8px; font-size: 12px; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<div id="offline-banner" class="offline-banner" style="display:none">Sin conexion a internet</div>
+
+<header class="header">
+  <div class="header-left">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+    </div>
+    <div>
+      <div class="header-title">VE Rates</div>
+      <div class="header-sub">Tasas de cambio en tiempo real</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="header-time" id="updateTime"></div>
+    <button class="refresh-btn" id="refreshBtn" onclick="fetchRates(true)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="main">
+  <!-- Rate Cards -->
+  <div class="rates-grid">
+    <div class="rate-card usd">
+      <div class="bar"></div>
+      <div class="card-top">
+        <div class="card-label">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <span class="card-name">Dolar BCV</span>
+        </div>
+        <span class="badge">OFICIAL</span>
+      </div>
+      <div id="usd-bcv">
+        <div class="skeleton"></div>
+      </div>
+      <div class="card-source" style="margin-top:4px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <span>Tasa oficial BCV</span>
+      </div>
+    </div>
+
+    <div class="rate-card eur">
+      <div class="bar"></div>
+      <div class="card-top">
+        <div class="card-label">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><path d="M10 3C6.2 5.5 4 9.7 4 14.5S6.2 23.5 10 26"/></svg>
+          </div>
+          <span class="card-name">Euro BCV</span>
+        </div>
+        <span class="badge">OFICIAL</span>
+      </div>
+      <div id="eur-bcv">
+        <div class="skeleton"></div>
+      </div>
+      <div class="card-source" style="margin-top:4px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <span>Tasa oficial BCV</span>
+      </div>
+    </div>
+
+    <div class="rate-card yadio">
+      <div class="bar"></div>
+      <div class="card-top">
+        <div class="card-label">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <span class="card-name">Dolar Yadio</span>
+        </div>
+        <span class="badge">YADIO</span>
+      </div>
+      <div id="usd-yadio">
+        <div class="skeleton"></div>
+      </div>
+      <div class="card-source" style="margin-top:4px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <span>Tasa Yadio.io</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spread -->
+  <div class="spread-card" id="spread-card" style="display:none">
+    <span class="spread-label">Diferencia BCV vs Yadio</span>
+    <span class="spread-value" id="spread-value"></span>
+  </div>
+
+  <!-- Calculator -->
+  <div class="calc-card">
+    <div class="calc-header">
+      <div class="calc-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h10"/><path d="M7 12h2"/><path d="M14 12h2"/><path d="M7 17h2"/><path d="M14 17h2"/></svg>
+      </div>
+      <div>
+        <div class="calc-title">Calculadora de Divisas</div>
+        <div class="calc-subtitle">Convierte entre bolivares y divisas</div>
+      </div>
+    </div>
+
+    <div class="dir-grid" id="dirGrid"></div>
+    <div class="separator"></div>
+
+    <div class="input-group">
+      <div class="input-label" id="fromLabel">Monto en USD</div>
+      <div class="input-wrap">
+        <input type="number" id="amountInput" placeholder="Ingrese monto" oninput="calculate()">
+        <span class="input-badge" id="fromBadge">USD</span>
+      </div>
+    </div>
+
+    <div class="swap-row">
+      <button class="swap-btn" onclick="swapDirection()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 15V3"/><path d="M21 3l-7 7"/><path d="M8 21h5v-5"/><path d="M3 21v-5"/><path d="M12 9v12"/><path d="M3 21l7-7"/></svg>
+      </button>
+    </div>
+
+    <div class="input-group">
+      <div class="input-label" id="toLabel">Resultado en VES</div>
+      <div class="result-box">
+        <span class="result-empty" id="resultValue">--</span>
+      </div>
+    </div>
+
+    <div class="rate-used" id="rateUsed" style="display:none"></div>
+  </div>
+
+  <!-- Quick amounts -->
+  <div class="quick-card">
+    <div class="quick-label">Cantidades rapidas</div>
+    <div class="quick-grid" id="quickGrid"></div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>Fuentes: BCV (Banco Central de Venezuela) · Yadio.io</p>
+    <p>Las tasas se actualizan automaticamente cada 5 minutos</p>
+  </div>
+</div>
+
+<script>
+// State
+let rates = null;
+let direction = 'USDtoVES';
+const directions = ['USDtoVES','VEStoUSD','EURtoVES','VEStoEUR','YadiotoVES','VEStoYadio'];
+const dirLabels = {
+  USDtoVES: 'USD (BCV) → VES', VEStoUSD: 'VES → USD (BCV)',
+  EURtoVES: 'EUR (BCV) → VES', VEStoEUR: 'VES → EUR (BCV)',
+  YadiotoVES: 'USD (Yadio) → VES', VEStoYadio: 'VES → USD (Yadio)'
+};
+const dirFrom = { USDtoVES:'USD', VEStoUSD:'VES', EURtoVES:'EUR', VEStoEUR:'VES', YadiotoVES:'USD', VEStoYadio:'VES' };
+const dirTo = { USDtoVES:'VES', VEStoUSD:'USD', EURtoVES:'VES', VEStoEUR:'EUR', YadiotoVES:'VES', VEStoYadio:'USD' };
+const dirSwap = { USDtoVES:'VEStoUSD', VEStoUSD:'USDtoVES', EURtoVES:'VEStoEUR', VEStoEUR:'EURtoVES', YadiotoVES:'VEStoYadio', VEStoYadio:'YadiotoVES' };
+
+function fmt(r) { return r === null ? 'N/A' : r.toFixed(2); }
+function fmtCur(v, c) {
+  if (c === 'VES') return 'Bs. ' + v.toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return c + ' ' + v.toLocaleString('en-US',{minimumFractionDigits:2,maximumDigits:2});
+}
+
+// Load cached rates
+function loadCached() {
+  try {
+    const c = localStorage.getItem('ve_rates_cache');
+    if (c) { rates = JSON.parse(c); renderRates(); }
+  } catch(e) {}
+}
+
+function saveCached() {
+  try { localStorage.setItem('ve_rates_cache', JSON.stringify(rates)); } catch(e) {}
+}
+
+// Fetch rates
+async function fetchRates(showRefresh) {
+  const btn = document.getElementById('refreshBtn');
+  if (showRefresh) btn.classList.add('spinning');
+
+  const isOffline = !navigator.onLine;
+  document.getElementById('offline-banner').style.display = isOffline ? 'block' : 'none';
+
+  if (isOffline) {
+    btn.classList.remove('spinning');
+    loadCached();
+    return;
+  }
+
+  try {
+    const [bcvRes, yadioRes] = await Promise.all([
+      fetch('https://ve.dolarapi.com/v1/dolares'),
+      fetch('https://api.yadio.io/rate/VES')
+    ]);
+
+    let usd_bcv = null, eur_bcv = null, usd_yadio = null;
+
+    if (bcvRes.ok) {
+      const bcvData = await bcvRes.json();
+      const oficial = bcvData.find(i => i.fuente && i.fuente.toLowerCase() === 'oficial');
+      usd_bcv = oficial ? oficial.promedio : null;
+    }
+
+    // Fetch EUR from BCV
+    try {
+      const eurRes = await fetch('https://ve.dolarapi.com/v1/euros');
+      if (eurRes.ok) {
+        const eurData = await eurRes.json();
+        const eurOficial = eurData.find(i => i.fuente && i.fuente.toLowerCase() === 'oficial');
+        eur_bcv = eurOficial ? eurOficial.promedio : null;
+      }
+    } catch(e) {}
+
+    if (yadioRes.ok) {
+      const yData = await yadioRes.json();
+      usd_yadio = yData.usd || null;
+    }
+
+    rates = { usd_bcv, eur_bcv, usd_yadio, last_update: new Date().toISOString() };
+    saveCached();
+    renderRates();
+  } catch(e) {
+    console.error('Error fetching rates:', e);
+    loadCached();
+  }
+
+  btn.classList.remove('spinning');
+}
+
+function renderRates() {
+  if (!rates) return;
+
+  document.getElementById('usd-bcv').innerHTML =
+    '<span style="font-size:26px;font-weight:800;letter-spacing:-0.5px">' + fmt(rates.usd_bcv) +
+    '</span><span class="card-bs"> Bs.</span>';
+
+  document.getElementById('eur-bcv').innerHTML =
+    '<span style="font-size:26px;font-weight:800;letter-spacing:-0.5px">' + fmt(rates.eur_bcv) +
+    '</span><span class="card-bs"> Bs.</span>';
+
+  document.getElementById('usd-yadio').innerHTML =
+    '<span style="font-size:26px;font-weight:800;letter-spacing:-0.5px">' + fmt(rates.usd_yadio) +
+    '</span><span class="card-bs"> Bs.</span>';
+
+  if (rates.usd_bcv && rates.usd_yadio) {
+    const spread = ((rates.usd_yadio - rates.usd_bcv) / rates.usd_bcv * 100).toFixed(2);
+    const sc = document.getElementById('spread-card');
+    sc.style.display = 'flex';
+    document.getElementById('spread-value').textContent = spread + '%';
+    document.getElementById('spread-value').style.color = rates.usd_yadio > rates.usd_bcv ? '#f59e0b' : '#10b981';
+  }
+
+  const t = rates.last_update ? new Date(rates.last_update).toLocaleTimeString('es-VE',{hour:'2-digit',minute:'2-digit'}) : '--:--';
+  document.getElementById('updateTime').textContent = t;
+
+  calculate();
+}
+
+// Direction buttons
+function renderDirections() {
+  const grid = document.getElementById('dirGrid');
+  grid.innerHTML = directions.map(d =>
+    '<button class="dir-btn' + (d === direction ? ' active' : '') + '" onclick="setDirection(\'' + d + '\')">' + dirLabels[d] + '</button>'
+  ).join('');
+}
+
+function setDirection(d) {
+  direction = d;
+  document.getElementById('amountInput').value = '';
+  document.getElementById('resultValue').textContent = '--';
+  document.getElementById('resultValue').className = 'result-empty';
+  document.getElementById('rateUsed').style.display = 'none';
+  updateLabels();
+  renderDirections();
+}
+
+function swapDirection() {
+  direction = dirSwap[direction];
+  document.getElementById('amountInput').value = '';
+  document.getElementById('resultValue').textContent = '--';
+  document.getElementById('resultValue').className = 'result-empty';
+  document.getElementById('rateUsed').style.display = 'none';
+  updateLabels();
+  renderDirections();
+}
+
+function updateLabels() {
+  const from = dirFrom[direction], to = dirTo[direction];
+  document.getElementById('fromLabel').textContent = 'Monto en ' + from;
+  document.getElementById('fromBadge').textContent = from;
+  document.getElementById('toLabel').textContent = 'Resultado en ' + to;
+  document.getElementById('amountInput').placeholder = 'Ingrese monto en ' + from;
+}
+
+function calculate() {
+  const val = parseFloat(document.getElementById('amountInput').value);
+  const el = document.getElementById('resultValue');
+  const rateEl = document.getElementById('rateUsed');
+
+  if (isNaN(val) || !rates) {
+    el.textContent = '--';
+    el.className = 'result-empty';
+    rateEl.style.display = 'none';
+    return;
+  }
+
+  let result = 0, rateVal = 0, rateLabel = '';
+  switch(direction) {
+    case 'USDtoVES': result = val * (rates.usd_bcv||0); rateVal = rates.usd_bcv; rateLabel = '1 USD = ' + fmt(rateVal) + ' Bs. (BCV)'; break;
+    case 'VEStoUSD': result = rates.usd_bcv ? val/rates.usd_bcv : 0; rateVal = rates.usd_bcv; rateLabel = '1 USD = ' + fmt(rateVal) + ' Bs. (BCV)'; break;
+    case 'EURtoVES': result = val * (rates.eur_bcv||0); rateVal = rates.eur_bcv; rateLabel = '1 EUR = ' + fmt(rateVal) + ' Bs. (BCV)'; break;
+    case 'VEStoEUR': result = rates.eur_bcv ? val/rates.eur_bcv : 0; rateVal = rates.eur_bcv; rateLabel = '1 EUR = ' + fmt(rateVal) + ' Bs. (BCV)'; break;
+    case 'YadiotoVES': result = val * (rates.usd_yadio||0); rateVal = rates.usd_yadio; rateLabel = '1 USD = ' + fmt(rateVal) + ' Bs. (Yadio)'; break;
+    case 'VEStoYadio': result = rates.usd_yadio ? val/rates.usd_yadio : 0; rateVal = rates.usd_yadio; rateLabel = '1 USD = ' + fmt(rateVal) + ' Bs. (Yadio)'; break;
+  }
+
+  el.textContent = fmtCur(result, dirTo[direction]);
+  el.className = 'result-value';
+
+  if (rateVal) {
+    rateEl.innerHTML = '<b>Tasa aplicada:</b> ' + rateLabel;
+    rateEl.style.display = 'block';
+  }
+}
+
+// Quick amounts
+function renderQuickAmounts() {
+  const grid = document.getElementById('quickGrid');
+  [1,5,10,20,50,100,500,1000].forEach(v => {
+    const btn = document.createElement('button');
+    btn.className = 'quick-btn';
+    btn.textContent = v;
+    btn.onclick = () => { document.getElementById('amountInput').value = v; calculate(); };
+    grid.appendChild(btn);
+  });
+}
+
+// Online/offline events
+window.addEventListener('online', () => {
+  document.getElementById('offline-banner').style.display = 'none';
+  fetchRates(true);
+});
+window.addEventListener('offline', () => {
+  document.getElementById('offline-banner').style.display = 'block';
+});
+
+// Init
+renderDirections();
+updateLabels();
+renderQuickAmounts();
+loadCached();
+fetchRates(false);
+setInterval(() => fetchRates(false), 5 * 60 * 1000);
+</script>
+</body>
+</html>
